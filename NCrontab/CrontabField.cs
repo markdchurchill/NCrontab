@@ -120,6 +120,18 @@ namespace NCrontab
         public int GetFirst() => _minValueSet < int.MaxValue ? _minValueSet : -1;
 
         /// <summary>
+        /// Gets the last value of the field or -1
+        /// </summary>
+        /// <returns></returns>
+        public int GetLast() => _maxValueSet > -1 ? _maxValueSet : -1;
+
+        /// <summary>
+        /// Gets the limiting value in the given direction
+        /// </summary>
+        public int GetLimit(int direction)
+            => direction > 0 ? GetLast() : GetFirst();
+
+        /// <summary>
         /// Gets the next value of the field that occurs after the given
         /// start value or -1 if there is no next value available.
         /// </summary>
@@ -139,6 +151,37 @@ namespace NCrontab
             }
 
             return -1;
+        }
+
+        /// <summary>
+        /// Gets the previous value of the field that occurs before the
+        /// given start value or -1 if there is no next value avaliable
+        /// </summary>
+        public int Previous(int start)
+        {
+            if (start > _maxValueSet)
+                return _maxValueSet;
+            
+            var startIndex = ValueToIndex(start);
+            var lastIndex = ValueToIndex(_minValueSet);
+
+            for (var i = startIndex; i >= lastIndex; i--)
+            {
+                if (_bits[i])
+                    return IndexToValue(i);
+            }
+
+            return -1;
+        }
+
+        public int InDirection(int start, int direction)
+        {
+            if (Math.Abs(direction) != 1) throw new ArgumentException(nameof(direction));
+
+            if (direction < 0)
+                return Previous(start);
+            else
+                return Next(start);
         }
 
         int IndexToValue(int index) => index + _impl.MinValue;

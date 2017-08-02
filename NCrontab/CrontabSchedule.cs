@@ -209,9 +209,16 @@ namespace NCrontab
         /// <paramref name="baseTime"/>. Also, <param name="endTime" /> is
         /// exclusive.
         /// </remarks>
-
         public DateTime GetNextOccurrence(DateTime baseTime, DateTime endTime)
+            => GetOccurrenceInDirection(baseTime, endTime, direction: 1);
+        public DateTime GetPreviousOccurence(DateTime baseTime, DateTime endTime)
+            => GetOccurrenceInDirection(baseTime, endTime, direction: -1);
+
+
+        public DateTime GetOccurrenceInDirection(DateTime baseTime, DateTime endTime, int direction)
         {
+            if(Math.Abs(direction) != 1) throw new ArgumentException(nameof(direction));
+
             const int nil = -1;
 
             var baseYear = baseTime.Year;
@@ -237,24 +244,24 @@ namespace NCrontab
             //
 
             var seconds = _seconds ?? SecondZero;
-            second = seconds.Next(second);
+            second = seconds.InDirection(second, direction);
 
             if (second == nil)
             {
-                second = seconds.GetFirst();
-                minute++;
+                second = seconds.GetLimit(-direction);
+                minute+=direction;
             }
 
             //
             // Minute
             //
 
-            minute = _minutes.Next(minute);
+            minute = _minutes.InDirection(minute, direction);
 
             if (minute == nil)
             {
-                minute = _minutes.GetFirst();
-                hour++;
+                minute = _minutes.GetLimit(-direction);
+                hour+=direction;
             }
 
             //
@@ -265,59 +272,59 @@ namespace NCrontab
 
             if (hour == nil)
             {
-                minute = _minutes.GetFirst();
-                hour = _hours.GetFirst();
-                day++;
+                minute = _minutes.GetLimit(-direction);
+                hour = _hours.GetLimit(-direction);
+                day+=direction;
             }
             else if (hour > baseHour)
             {
-                minute = _minutes.GetFirst();
+                minute = _minutes.GetLimit(-direction);
             }
 
             //
             // Day
             //
 
-            day = _days.Next(day);
+            day = _days.InDirection(day, direction);
 
             RetryDayMonth:
 
             if (day == nil)
             {
-                second = seconds.GetFirst();
-                minute = _minutes.GetFirst();
-                hour = _hours.GetFirst();
-                day = _days.GetFirst();
-                month++;
+                second = seconds.GetLimit(-direction);
+                minute = _minutes.GetLimit(-direction);
+                hour = _hours.GetLimit(-direction);
+                day = _days.GetLimit(-direction);
+                month+= direction;
             }
-            else if (day > baseDay)
+            else if (day != baseDay)
             {
-                second = seconds.GetFirst();
-                minute = _minutes.GetFirst();
-                hour = _hours.GetFirst();
+                second = seconds.GetLimit(-direction);
+                minute = _minutes.GetLimit(-direction);
+                hour = _hours.GetLimit(-direction);
             }
 
             //
             // Month
             //
 
-            month = _months.Next(month);
+            month = _months.InDirection(month, direction);
 
             if (month == nil)
             {
-                second = seconds.GetFirst();
-                minute = _minutes.GetFirst();
-                hour = _hours.GetFirst();
-                day = _days.GetFirst();
-                month = _months.GetFirst();
-                year++;
+                second = seconds.GetLimit(-direction);
+                minute = _minutes.GetLimit(-direction);
+                hour = _hours.GetLimit(-direction);
+                day = _days.GetLimit(-direction);
+                month = _months.GetLimit(-direction);
+                year+=direction;
             }
-            else if (month > baseMonth)
+            else if (month != baseMonth)
             {
-                second = seconds.GetFirst();
-                minute = _minutes.GetFirst();
-                hour = _hours.GetFirst();
-                day = _days.GetFirst();
+                second = seconds.GetLimit(-direction);
+                minute = _minutes.GetLimit(-direction);
+                hour = _hours.GetLimit(-direction);
+                day = _days.GetLimit(-direction);
             }
 
             //
@@ -339,7 +346,7 @@ namespace NCrontab
 
             var dateChanged = day != baseDay || month != baseMonth || year != baseYear;
 
-            if (day > 28 && dateChanged && day > Calendar.GetDaysInMonth(year, month))
+            if (direction > 0 && day > 28 && dateChanged && day > Calendar.GetDaysInMonth(year, month))
             {
                 if (year >= endYear && month >= endMonth && day >= endDay)
                     return endTime;
@@ -350,7 +357,8 @@ namespace NCrontab
 
             var nextTime = new DateTime(year, month, day, hour, minute, second, 0, baseTime.Kind);
 
-            if (nextTime >= endTime)
+            var comparand = nextTime.CompareTo(endTime);
+            if (comparand == direction || comparand == 0)
                 return endTime;
 
             //
@@ -360,7 +368,11 @@ namespace NCrontab
             if (_daysOfWeek.Contains((int) nextTime.DayOfWeek))
                 return nextTime;
 
-            return GetNextOccurrence(new DateTime(year, month, day, 23, 59, 59, 0, baseTime.Kind), endTime);
+            if (direction > 0)
+                return GetOccurrenceInDirection(new DateTime(year, month, day, 23, 59, 59, 0, baseTime.Kind), endTime,
+                    direction);
+            else
+                return GetOccurrenceInDirection(new DateTime(year, month, day, 0, 0, 0, baseTime.Kind), endTime, direction);
         }
 
         /// <summary>
